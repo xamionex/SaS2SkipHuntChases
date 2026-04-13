@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Bestiary.monsters;
 using ProjectMage.character;
 using ProjectMage.gamestate;
@@ -9,6 +10,9 @@ namespace SaS2SkipHuntChases;
 
 internal static class MageSkipHelper
 {
+    // Tracks extra drops based on character ID to multiply loot upon death.
+    internal static readonly Dictionary<int, int> SkippedPhasesCount = new();
+    
     internal static bool ShouldSkipMissionMage(Mage mage)
     {
         // activeMission == -1 means this is a wandering mage; handled separately.
@@ -37,7 +41,7 @@ internal static class MageSkipHelper
 
             if (arenaIdx > -1)
             {
-                if (Plugin.GetMaxHpMethod != null)
+                if (Plugin.GetMaxHpMethod != null && Plugin.ReduceBossHp.Value)
                 {
                     var monsterDef = MonsterCatalog.monsterDef[character.monsterIdx];
                     var maxHp = (float)Plugin.GetMaxHpMethod.Invoke(monsterDef.gameMonster, [character]);
@@ -70,6 +74,12 @@ internal static class MageSkipHelper
     // Change values of mage so the hunt gets finished
     internal static void MarkCyclesComplete(Mage mage)
     {
+        var skipped = mage.totalCycles - mage.cycle;
+        if (skipped > 0)
+        {
+            SkippedPhasesCount[mage.charIdx] = skipped;
+        }
+        
         mage.cycle       = mage.totalCycles;
         mage.cycleDamage = mage.cycleMaxDamage + 1f;
         mage.totalDamage = mage.monsterHP;

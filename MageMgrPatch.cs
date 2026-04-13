@@ -8,6 +8,7 @@ using ProjectMage.gamestate.mage;
 
 namespace SaS2SkipHuntChases;
 
+[HarmonyPatch]
 public static class MageMgrPatch
 {
     // WANDERING MAGES: patch AddMage, which is how non-mission mages get registered.
@@ -40,7 +41,7 @@ public static class MageMgrPatch
     [HarmonyPatch(typeof(MageMgr), "SetMissionTarget")]
     [HarmonyPostfix]
     // ReSharper disable once InconsistentNaming
-    public static void Postfix(MageMgr __instance, MissionTarget target, int mageIdx)
+    public static void SetMissionTargetPatch(MageMgr __instance, MissionTarget target, int mageIdx)
     {
         if (!NetworkMgr.Instance.IsHost()) return;
 
