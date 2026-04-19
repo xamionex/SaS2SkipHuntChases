@@ -26,14 +26,17 @@ public class Plugin : BasePlugin
     internal static MethodInfo GetAddCharToArenaIdxMethod;
     internal static MethodInfo OnAddCharToArenaMethod;
 
-    internal static ConfigEntry<bool> SkipMissionMages;
+    internal static ConfigEntry<bool> SkipNamedMages;
+    internal static ConfigEntry<bool> SkipNamelessMages;
+    internal static ConfigEntry<bool> SkipGauntletMages;
     internal static ConfigEntry<bool> SkipWanderingMages;
-    internal static ConfigEntry<bool> SkipOptionalMages;
-    internal static ConfigEntry<bool> SkipInvisibleMages;
+    //internal static ConfigEntry<bool> SkipOptionalMages;
+    //internal static ConfigEntry<bool> SkipInvisibleMages;
     internal static ConfigEntry<bool> SpawnAtFinalLocation;
     internal static ConfigEntry<bool> DropLootRelativeAmount;
     internal static ConfigEntry<float> DropLootMultiplier;
     internal static ConfigEntry<bool> ReduceBossHp;
+    internal static ConfigEntry<float> BossHpMultiplier;
     
     private FileSystemWatcher _configWatcher;
     private Timer _debounceTimer;
@@ -42,16 +45,18 @@ public class Plugin : BasePlugin
     {
         Instance = this;
 
-        SkipMissionMages = Config.Bind("General", "SkipMissionMages", true, "Skip hunt phases for main mission mages (recommended).");
-        SkipWanderingMages = Config.Bind("General", "SkipWanderingMages", false, "Skip hunt phases for wandering/roaming mages.");
-        SkipOptionalMages = Config.Bind("General", "SkipOptionalMages", false, "Skip hunt phases for optional mages.");
-        SkipInvisibleMages = Config.Bind("General", "SkipInvisibleMages", false, "Skip hunt phases for invisible mission mages.");
-        SpawnAtFinalLocation = Config.Bind("General", "SpawnAtFinalLocation", true, "Teleport mission mages directly to their final arena location instead of spawning at zone 0.");
-        DropLootRelativeAmount = Config.Bind("General", "DropLootRelativeAmount", true, "Drop loot relative to the amount of skipped phases when the mage dies.");
-        DropLootRelativeAmount = Config.Bind("Loot", "DropLootRelativeAmount", true, "Drop loot for each skipped hunt phase.");
-        DropLootMultiplier = Config.Bind("Loot", "DropLootMultiplier", 1.0f, new ConfigDescription("Multiplier for the amount of silver and probability of materials dropped from skipped phases.", new AcceptableValueRange<float>(0.1f, 10.0f)));
+        SkipNamedMages    = Config.Bind("General", "SkipNamedMages",    true,  "Skip hunt phases for named mission mages (e.g. Arzhan-Tin, Celus Zend).");
+        SkipNamelessMages = Config.Bind("General", "SkipNamelessMages", true,  "Skip hunt phases for nameless mission mages (repeatable hunts, reward token_nameless).");
+        SkipGauntletMages = Config.Bind("General", "SkipGauntletMages", true,  "Skip hunt phases for gauntlet mages (each one immediately starts a boss fight).");
+        SkipWanderingMages  = Config.Bind("General", "SkipWanderingMages",  false, "Skip hunt phases for wandering/roaming mages.");
+        //SkipOptionalMages   = Config.Bind("General", "SkipOptionalMages",   false, "Skip hunt phases for optional mages present during another hunt.");
+        //SkipInvisibleMages  = Config.Bind("General", "SkipInvisibleMages",  false, "Skip hunt phases for hidden hunt mages.");
+        SpawnAtFinalLocation   = Config.Bind("General", "SpawnAtFinalLocation",   true, "When skipping, teleport mission mages to their arena entrance. If false, they spawn at zone 0 and walk there.");
+        DropLootRelativeAmount = Config.Bind("Loot",    "DropLootRelativeAmount", true, "Drop loot for each skipped hunt phase.");
+        DropLootMultiplier     = Config.Bind("Loot",    "DropLootMultiplier",     1.0f, new ConfigDescription("Multiplier for the amount of silver and probability of materials dropped from skipped phases.", new AcceptableValueRange<float>(0.1f, 10.0f)));
         ReduceBossHp = Config.Bind("General", "ReduceBossHP", true, "Start boss fight with reduced HP (simulates hunt damage).");
-        
+        BossHpMultiplier = Config.Bind("General", "BossHpMultiplier", 1.0f, "Multiply mage HP with this value");
+
         var modOptionsType = Type.GetType("SaS2ModOptions.SaS2ModOptions, amione.SaS2ModOptions");
         if (modOptionsType != null)
         {
@@ -62,7 +67,7 @@ public class Plugin : BasePlugin
         {
             Instance.Log.LogInfo("Mod Options not installed; config file only.");
         }
-        
+
         GetPathNodeMethod = AccessTools.Method(typeof(Mage), "GetPathNode");
         if (GetPathNodeMethod == null)
             Instance.Log.LogWarning("GetPathNode not found, SpawnAtFinalLocation will be disabled.");
@@ -110,20 +115,23 @@ public class Plugin : BasePlugin
         harmony.PatchAll();
         Instance.Log.LogInfo($"{PluginInfo.PluginName} v{PluginInfo.PluginVersion} loaded, hunt phases will be skipped.");
     }
-    
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void TryRegisterModOptions()
     {
         // ReSharper disable RedundantAssignment
         var order = 0;
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipMissionMages, "Skip Hunt Chases", "Skip Mission Mages", order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipWanderingMages, "Skip Hunt Chases", "Skip Wandering Mages", order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipOptionalMages, "Skip Hunt Chases", "Skip Optional Mages", order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipInvisibleMages, "Skip Hunt Chases", "Skip Invisible Mages", order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SpawnAtFinalLocation, "Skip Hunt Chases", "Spawn At Final Location", order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipNamedMages,    "Skip Hunt Chases", "Skip Named Mages",    order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipNamelessMages, "Skip Hunt Chases", "Skip Nameless Mages", order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipGauntletMages, "Skip Hunt Chases", "Skip Gauntlet Mages", order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipWanderingMages,  "Skip Hunt Chases", "Skip Wandering Mages",  order += 1);
+        //SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipOptionalMages,   "Skip Hunt Chases", "Skip Optional Mages",   order += 1);
+        //SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipInvisibleMages,  "Skip Hunt Chases", "Skip Hidden Hunt Mages",  order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SpawnAtFinalLocation,   "Skip Hunt Chases", "Spawn At Final Location",           order += 1);
         SaS2ModOptions.SaS2ModOptions.RegisterConfig(DropLootRelativeAmount, "Skip Hunt Chases", "Extra Loot Based on Skipped Phases", order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(DropLootMultiplier, "Skip Hunt Chases", "Loot Multiplier", order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(ReduceBossHp, "Skip Hunt Chases", "Reduce Boss HP", order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(DropLootMultiplier,     "Skip Hunt Chases", "Loot Multiplier",                   order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(ReduceBossHp,           "Skip Hunt Chases", "Reduce Boss HP",                    order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(BossHpMultiplier,           "Skip Hunt Chases", "Boss HP Multiplier",                    order += 1);
         // ReSharper restore RedundantAssignment
     }
 

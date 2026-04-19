@@ -4,6 +4,7 @@ using Common;
 using HarmonyLib;
 using ProjectMage;
 using ProjectMage.character;
+using ProjectMage.gamestate;
 using ProjectMage.gamestate.mage;
 
 namespace SaS2SkipHuntChases;
@@ -29,11 +30,11 @@ public static class MageMgrPatch
 
         MageSkipHelper.MarkCyclesComplete(mage);
 
-        // Wandering mages have no custom path and no designated arena, so we just park them in BATTLE_2.
+        // Wandering mages have no custom path and no designated arena, so we just park them in BATTLE.
         // They'll fight in place like a boss and won't try to flee to any zone.
-        Plugin.SetPhaseMethod?.Invoke(mage, [6]);
+        Plugin.SetPhaseMethod?.Invoke(mage, [3]);
 
-        Plugin.Instance.Log.LogDebug($"Wandering mage {mage.charIdx} hunt phases skipped.");
+        Plugin.Instance.Log.LogInfo($"Wandering mage {mage.charIdx} hunt phases skipped.");
     }
     
     // MISSION MAGES: patch SetMissionTarget, which is the last step in CreateMages() after Activate() and after character.loc is set.
@@ -53,8 +54,18 @@ public static class MageMgrPatch
 
         var character = CharMgr.character[mage.charIdx];
 
-        // Teleport to final path node before the arena lookup so GetAddCharToArenaIdx can match the right arena by position.
-        if (Plugin.SpawnAtFinalLocation.Value && Plugin.GetPathNodeMethod != null && mage.hasCustomPath)
+        // Check if there is an arena near the mage's current position (before teleport)
+        var hasArena = false;
+        if (Plugin.GetAddCharToArenaIdxMethod != null)
+        {
+            var arenas = GameSessionMgr.gameSession.mapMgr.arenas;
+            var arenaIdxObj = Plugin.GetAddCharToArenaIdxMethod.Invoke(arenas, [character]);
+            if (arenaIdxObj != null && (int)arenaIdxObj != -1)
+                hasArena = true;
+        }
+
+        // Only teleport if an arena already exists (i.e., this is the main mage)
+        if (hasArena && Plugin.SpawnAtFinalLocation.Value && Plugin.GetPathNodeMethod != null && mage.hasCustomPath)
         {
             try
             {
@@ -73,7 +84,6 @@ public static class MageMgrPatch
         }
 
         MageSkipHelper.TryPromoteToBoss(character, mage);
-
-        Plugin.Instance.Log.LogDebug($"Mission mage {mage.charIdx} hunt phases skipped.");
+        Plugin.Instance.Log.LogInfo($"Mission mage {mage.charIdx} hunt phases skipped.");
     }
 }
