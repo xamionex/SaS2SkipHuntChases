@@ -121,17 +121,17 @@ public class Plugin : BasePlugin
     {
         // ReSharper disable RedundantAssignment
         var order = 0;
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipNamedMages,    "Skip Hunt Chases", "Skip Named Mages",    order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipNamelessMages, "Skip Hunt Chases", "Skip Nameless Mages", order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipGauntletMages, "Skip Hunt Chases", "Skip Gauntlet Mages", order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipWanderingMages,  "Skip Hunt Chases", "Skip Wandering Mages",  order += 1);
-        //SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipOptionalMages,   "Skip Hunt Chases", "Skip Optional Mages",   order += 1);
-        //SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipInvisibleMages,  "Skip Hunt Chases", "Skip Hidden Hunt Mages",  order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SpawnAtFinalLocation,   "Skip Hunt Chases", "Spawn At Final Location",           order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(DropLootRelativeAmount, "Skip Hunt Chases", "Extra Loot Based on Skipped Phases", order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(DropLootMultiplier,     "Skip Hunt Chases", "Loot Multiplier",                   order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(ReduceBossHp,           "Skip Hunt Chases", "Reduce Boss HP",                    order += 1);
-        SaS2ModOptions.SaS2ModOptions.RegisterConfig(BossHpMultiplier,           "Skip Hunt Chases", "Boss HP Multiplier",                    order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipNamedMages,            "Skip Hunt Chases", "Skip Named Mages",                         order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipNamelessMages,         "Skip Hunt Chases", "Skip Nameless Mages",                      order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipGauntletMages,         "Skip Hunt Chases", "Skip Gauntlet Mages",                      order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipWanderingMages,        "Skip Hunt Chases", "Skip Wandering Mages",                     order += 1);
+        //SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipOptionalMages,         "Skip Hunt Chases", "Skip Optional Mages",                      order += 1);
+        //SaS2ModOptions.SaS2ModOptions.RegisterConfig(SkipInvisibleMages,        "Skip Hunt Chases", "Skip Hidden Hunt Mages",                   order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(SpawnAtFinalLocation,      "Skip Hunt Chases", "Spawn At Final Location",                  order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(DropLootRelativeAmount,    "Skip Hunt Chases", "Extra Loot Based on Skipped Phases",       order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(DropLootMultiplier,        "Skip Hunt Chases", "Loot Multiplier",                          order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(ReduceBossHp,              "Skip Hunt Chases", "Reduce Boss HP",                           order += 1);
+        SaS2ModOptions.SaS2ModOptions.RegisterConfig(BossHpMultiplier,          "Skip Hunt Chases", "Boss HP Multiplier",                       order += 1);
         // ReSharper restore RedundantAssignment
     }
 

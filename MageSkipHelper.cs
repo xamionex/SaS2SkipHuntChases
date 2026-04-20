@@ -11,7 +11,7 @@ namespace SaS2SkipHuntChases;
 
 internal static class MageSkipHelper
 {
-    // Tracks skipped phase count per character ID for the loot multiplier on death.
+    /// Tracks skipped phase count per character ID for the loot multiplier on death.
     internal static readonly Dictionary<int, int> SkippedPhasesCount = new();
     private static readonly List<int> LoggedMages = [];
 
@@ -51,6 +51,7 @@ internal static class MageSkipHelper
     }
 
     internal static bool ShouldSkipWanderingMage() => GameSessionMgr.gameSession.activeMission < 0 && Plugin.SkipWanderingMages.Value;
+    internal static bool ShouldSkipGauntletMage() => GauntletMgr.IsActive && Plugin.SkipGauntletMages.Value;
 
     // Mirrors the boss-promotion block inside NextCycle(), fired immediately so the boss intro (bar, name, splash) plays without an extra flee warp.
     internal static void TryPromoteToBoss(Character character, Mage mage)
@@ -67,7 +68,7 @@ internal static class MageSkipHelper
             var arenas  = GameSessionMgr.gameSession.mapMgr.arenas;
             var arenaIdx = (int)Plugin.GetAddCharToArenaIdxMethod.Invoke(arenas, [character]);
 
-            ReduceBossHp(character);
+            if (!GauntletMgr.IsActive) ReduceBossHp(character, mage);
             if (arenaIdx > -1)
             {
                 character.boss = true;
@@ -88,16 +89,17 @@ internal static class MageSkipHelper
         }
     }
 
-    private static void ReduceBossHp(Character character)
+    internal static void ReduceBossHp(Character character, Mage mage)
     {
         if (Plugin.GetMaxHpMethod == null) return;
-        
+
         var oldHp =  character.hp;
         var monsterDef = MonsterCatalog.monsterDef[character.monsterIdx];
         var maxHp = (float)Plugin.GetMaxHpMethod.Invoke(monsterDef.gameMonster, [character]);
         var targetHp = Plugin.ReduceBossHp.Value ? GauntletMgr.IsActive ? maxHp / 2f : maxHp / 4f : maxHp;
         character.hp = targetHp * Plugin.BossHpMultiplier.Value;
-        if (Math.Abs(oldHp - character.hp) > 0.1) Plugin.Instance.Log.LogInfo($"Changed {character.mageIdx} max HP from {oldHp} to {character.hp}");
+        mage.monsterHP = character.hp;
+        if (Math.Abs(oldHp - character.hp) > 0.1) Plugin.Instance.Log.LogInfo($"Changed mage {mage.charIdx} max HP from {oldHp} to {character.hp}");
     }
     
     // Mark all hunt cycles as complete and record how many were skipped for the loot multiplier on death.
