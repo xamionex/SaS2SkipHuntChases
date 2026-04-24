@@ -33,9 +33,8 @@ public static class MageMgrPatch
         // Wandering mages
         if (MageSkipHelper.ShouldSkipWanderingMage())
         {
-            MageSkipHelper.ReduceBossHp(character, mage);
             MageSkipHelper.MarkCyclesComplete(mage);
-            Plugin.SetPhaseMethod?.Invoke(mage, [3]);
+            MageSkipHelper.TryPromoteToBoss(character, mage);
             Plugin.Instance.Log.LogInfo($"Wandering mage {mage.charIdx} hunt phases skipped.");
             return;
         }
@@ -45,7 +44,6 @@ public static class MageMgrPatch
         {
             MageSkipHelper.MarkCyclesComplete(mage);
             MageSkipHelper.TryPromoteToBoss(character, mage);
-            Plugin.SetPhaseMethod?.Invoke(mage, [3]);
             Plugin.Instance.Log.LogInfo($"Gauntlet mage {mage.charIdx} hunt phases skipped.");
         }
     }
@@ -84,18 +82,8 @@ public static class MageMgrPatch
 
         var character = CharMgr.character[mage.charIdx];
 
-        // Check if there is an arena near the mage's current position (before teleport)
-        var hasArena = false;
-        if (Plugin.GetAddCharToArenaIdxMethod != null)
-        {
-            var arenas = GameSessionMgr.gameSession.mapMgr.arenas;
-            var arenaIdxObj = Plugin.GetAddCharToArenaIdxMethod.Invoke(arenas, [character]);
-            if (arenaIdxObj != null && (int)arenaIdxObj != -1)
-                hasArena = true;
-        }
-
-        // Only teleport if an arena already exists (i.e., this is the main mage)
-        if (hasArena && Plugin.SpawnAtFinalLocation.Value && Plugin.GetPathNodeMethod != null && mage.hasCustomPath)
+        // Teleport to final path node before the arena lookup so GetAddCharToArenaIdx can match the right arena by position.
+        if (Plugin.SpawnAtFinalLocation.Value && Plugin.GetPathNodeMethod != null && mage.hasCustomPath)
         {
             try
             {
@@ -105,6 +93,7 @@ public static class MageMgrPatch
                     finalNode.Y = CharCols.GetGround(finalNode);
                     character.loc = finalNode;
                     character.warp.SetWarpIn(2f, finalNode, 3f, 1);
+                    Plugin.Instance.Log.LogInfo($"Mission mage {mage.charIdx} ({MageSkipHelper.GetMageName(mage)}) warped to last location.");
                 }
             }
             catch (Exception ex)
@@ -114,6 +103,5 @@ public static class MageMgrPatch
         }
 
         MageSkipHelper.TryPromoteToBoss(character, mage);
-        Plugin.Instance.Log.LogInfo($"Mission mage {mage.charIdx} hunt phases skipped.");
     }
 }

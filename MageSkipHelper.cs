@@ -22,7 +22,7 @@ internal static class MageSkipHelper
 
         if (!LoggedMages.Contains(mage.charIdx))
         {
-            Plugin.Instance.Log.LogInfo($"mage detected: ID {mage.charIdx}, Name {GetMageName(mage)}, Invisible: {mage.missionInvisible}, Optional: {mage.optional}, Active Mission: {activeMission}, Mission Type: {missionType}");
+            Plugin.Instance.Log.LogInfo($"mage detected: ID {mage.charIdx} ({GetMageName(mage)}), Invisible: {mage.missionInvisible}, Optional: {mage.optional}, Active Mission: {activeMission}, Mission Type: {missionType}");
             LoggedMages.Add(mage.charIdx);
         }
 
@@ -38,10 +38,14 @@ internal static class MageSkipHelper
         //if (mage.missionInvisible) return Plugin.SkipInvisibleMages.Value;
 
         // Type 1 = Named hunt, type 2 = Nameless (token_nameless reward). Any other type falls back to Named hunt.
-        return missionType == 2 ? Plugin.SkipNamelessMages.Value : Plugin.SkipNamedMages.Value;
+        return missionType switch
+        {
+            2 => Plugin.SkipNamelessMages.Value,
+            _ => Plugin.SkipNamedMages.Value
+        };
     }
-    
-    private static string GetMageName(Mage mage)
+
+    internal static string GetMageName(Mage mage)
     {
         if (mage.charIdx < 0) return "Unknown";
         var character = CharMgr.character[mage.charIdx];
@@ -56,13 +60,6 @@ internal static class MageSkipHelper
     // Mirrors the boss-promotion block inside NextCycle(), fired immediately so the boss intro (bar, name, splash) plays without an extra flee warp.
     internal static void TryPromoteToBoss(Character character, Mage mage)
     {
-        if (Plugin.GetAddCharToArenaIdxMethod == null || Plugin.OnAddCharToArenaMethod == null)
-        {
-            // Reflection unavailable, fall back to BATTLE_2 and let Update promote naturally.
-            Plugin.SetPhaseMethod?.Invoke(mage, [6]);
-            return;
-        }
-
         try
         {
             var arenas  = GameSessionMgr.gameSession.mapMgr.arenas;
@@ -73,19 +70,18 @@ internal static class MageSkipHelper
             {
                 character.boss = true;
                 Plugin.OnAddCharToArenaMethod.Invoke(null, [character.ID, arenaIdx]);
-                Plugin.Instance.Log.LogDebug($"Mage {mage.charIdx} promoted to boss in arena {arenaIdx}.");
+                Plugin.Instance.Log.LogInfo($"Mage {mage.charIdx} ({GetMageName(mage)}) promoted to boss in arena {arenaIdx}.");
             }
             else
             {
                 // Not near an arena yet, stand in BATTLE_2 until the player walks close.
                 Plugin.SetPhaseMethod?.Invoke(mage, [6]);
-                Plugin.Instance.Log.LogDebug($"Mage {mage.charIdx}: no arena found, waiting in BATTLE_2.");
+                Plugin.Instance.Log.LogInfo($"Mage {mage.charIdx} ({GetMageName(mage)}): no arena found, waiting in BATTLE_2.");
             }
         }
         catch (Exception ex)
         {
             Plugin.Instance.Log.LogWarning($"TryPromoteToBoss failed: {ex.Message}");
-            Plugin.SetPhaseMethod?.Invoke(mage, [6]);
         }
     }
 
@@ -111,5 +107,6 @@ internal static class MageSkipHelper
         mage.cycle       = mage.totalCycles;
         mage.cycleDamage = mage.cycleMaxDamage + 1f;
         mage.totalDamage = mage.monsterHP;
+        Plugin.Instance.Log.LogInfo($"Completed cycles of mage {mage.charIdx} ({GetMageName(mage)}).");
     }
 }
