@@ -7,6 +7,7 @@ using ProjectMage.character;
 using ProjectMage.gamestate;
 using ProjectMage.gamestate.arenastate;
 using ProjectMage.gamestate.mage;
+using ProjectMage.map.arena;
 
 namespace SaS2SkipHuntChases;
 
@@ -23,46 +24,41 @@ public static class MageMgrPatch
     // ReSharper restore InconsistentNaming
     {
         if (!NetworkMgr.Instance.IsHost()) return;
-        if (__result < 0) return; // AddMage returns -1 if the slot was full
+        if (__result < 0) return;
+
+        // Gauntlet mages are handled in OnCharacterSpawnPatch because GauntletMgr sets totalCycles AFTER AddMage returns, so totalCycles == 0 here.
+        if (GauntletMgr.IsActive) return;
+
+        if (!MageSkipHelper.ShouldSkipWanderingMage()) return;
 
         var mage = __instance.mage[__result];
-
-        // Wandering and gauntlet mages have no custom path and no designated arena, so we just park them in BATTLE.
-        // They'll fight in place like a boss and won't try to flee to any zone.
-
-        // Wandering mages
-        if (MageSkipHelper.ShouldSkipWanderingMage())
-        {
-            MageSkipHelper.MarkCyclesComplete(mage);
-            MageSkipHelper.TryPromoteToBoss(character, mage);
-            Plugin.Instance.Log.LogInfo($"Wandering mage {mage.charIdx} hunt phases skipped.");
-            return;
-        }
-
-        // Gauntlet mages
-        if (MageSkipHelper.ShouldSkipGauntletMage())
-        {
-            MageSkipHelper.MarkCyclesComplete(mage);
-            MageSkipHelper.TryPromoteToBoss(character, mage);
-            Plugin.Instance.Log.LogInfo($"Gauntlet mage {mage.charIdx} hunt phases skipped.");
-        }
+        MageSkipHelper.MarkCyclesComplete(mage);
+        MageSkipHelper.TryPromoteToBoss(character, mage);
+        MageSkipHelper.ReduceBossHp(character, mage);
+        Plugin.Instance.Log.LogInfo($"Wandering mage {mage.charIdx} hunt phases skipped.");
     }
-    
-    /// Reduce HP for Gauntlet Mages
+
+    /// GAUNTLET MAGES: OnCharacterSpawn fires after GauntletMgr sets totalCycles.
     [HarmonyPatch(typeof(NetworkEvents), "OnCharacterSpawn")]
     [HarmonyPostfix]
     public static void OnCharacterSpawnPatch(int charIndex, bool summoned, float warpInDelay)
     {
-        if (!NetworkMgr.Instance.IsHost() || !GauntletMgr.IsActive || !MageSkipHelper.ShouldSkipGauntletMage()) 
-            return;
+        if (!NetworkMgr.Instance.IsHost()) return;
+        if (!GauntletMgr.IsActive || !MageSkipHelper.ShouldSkipGauntletMage()) return;
 
+        if (charIndex < 0 || charIndex >= CharMgr.character.Length) return;
         var character = CharMgr.character[charIndex];
-        if (character == null || character.mageIdx < 0 || !character.boss) 
-            return;
+        if (!character.exists || character.mageIdx < 0) return;
 
         var mage = GameSessionMgr.gameSession.mageMgr.mage[character.mageIdx];
+        if (mage == null || !mage.exists) return;
 
+        if (mage.totalCycles == 0 || mage.cycle >= mage.totalCycles) return;
+
+        MageSkipHelper.MarkCyclesComplete(mage);
+        MageSkipHelper.TryPromoteToBoss(character, mage);
         MageSkipHelper.ReduceBossHp(character, mage);
+        Plugin.Instance.Log.LogInfo($"Gauntlet mage {mage.charIdx} promoted on spawn.");
     }
     
     /// MISSION MAGES: patch SetMissionTarget, which is the last step in CreateMages() after Activate() and after character.loc is set.
@@ -75,7 +71,6 @@ public static class MageMgrPatch
         if (!NetworkMgr.Instance.IsHost()) return;
 
         var mage = __instance.mage[mageIdx];
-
         if (!MageSkipHelper.ShouldSkipMissionMage(mage)) return;
 
         MageSkipHelper.MarkCyclesComplete(mage);
@@ -93,7 +88,7 @@ public static class MageMgrPatch
                     finalNode.Y = CharCols.GetGround(finalNode);
                     character.loc = finalNode;
                     character.warp.SetWarpIn(2f, finalNode, 3f, 1);
-                    Plugin.Instance.Log.LogInfo($"Mission mage {mage.charIdx} ({MageSkipHelper.GetMageName(mage)}) warped to last location.");
+                    Plugin.Instance.Log.LogInfo($"Mission mage {mage.charIdx} ({MageSkipHelper.GetMageName(mage)}) warped to final location.");
                 }
             }
             catch (Exception ex)
@@ -103,5 +98,42 @@ public static class MageMgrPatch
         }
 
         MageSkipHelper.TryPromoteToBoss(character, mage);
+
+        // Apply HP reduction immediately after promotion.
+        // When SpawnAtFinalLocation is on the mage is already inside the arena rect so TryPromoteToBoss promotes it right here, we must set HP now, before the network sync in OnGoToArena can overwrite it.
+        // MapArenaActivatePatch handles the BATTLE_2 fallback case where the mage waits outside and gets promoted later.
+        MageSkipHelper.ReduceBossHp(character, mage);
+    }
+
+    /// Re-apply HP reduction the moment the arena fight begins.
+    /// Covers BATTLE_2 fallback mages promoted later when the player walks close, and acts as a safety net in case anything reset HP between spawn and fight.
+    [HarmonyPatch(typeof(MapArena), "Activate")]
+    [HarmonyPostfix]
+    // ReSharper disable once InconsistentNaming
+    public static void MapArenaActivatePatch(MapArena __instance)
+    {
+        if (!NetworkMgr.Instance.IsHost()) return;
+        if (__instance.boss == null) return;
+
+        foreach (var charId in __instance.boss)
+        {
+            if (charId < 0 || charId >= CharMgr.character.Length) continue;
+            var character = CharMgr.character[charId];
+            if (!character.exists || character.mageIdx < 0) continue;
+
+            var mage = GameSessionMgr.gameSession.mageMgr.mage[character.mageIdx];
+            if (mage == null || !mage.exists) continue;
+
+            MageSkipHelper.ReduceBossHp(character, mage);
+        }
+    }
+
+    /// Clear the promotion cache on map load so stale IDs don't block fresh mages.
+    [HarmonyPatch(typeof(NetworkEvents), "OnMapLoading")]
+    [HarmonyPostfix]
+    public static void OnMapLoadingPatch()
+    {
+        MageSkipHelper.ClearPromotionCache();
+        Plugin.Instance.Log.LogDebug("Promotion cache cleared on map load.");
     }
 }

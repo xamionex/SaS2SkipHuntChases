@@ -14,7 +14,7 @@ namespace SaS2SkipHuntChases;
 public static class CharDeathPatch
 {
     private static readonly FieldInfo CharacterField = AccessTools.Field(typeof(CharDeath), "character");
-    private static readonly FieldInfo RandField = AccessTools.Field(typeof(CharDeath), "Rand");
+    private static readonly FieldInfo RandField      = AccessTools.Field(typeof(CharDeath), "Rand");
     private static MethodInfo _getCharmValMethod;
 
     [HarmonyPatch(typeof(CharDeath), nameof(CharDeath.DropLoot))]
@@ -25,27 +25,34 @@ public static class CharDeathPatch
         var character = (Character)CharacterField.GetValue(__instance);
         if (character == null) return true;
 
-        if (!Plugin.DropLootRelativeAmount.Value || !MageSkipHelper.SkippedPhasesCount.TryGetValue(character.ID, out var extraPhases)) return true; // Let original DropLoot run once for Artifacts/Quest items
-        MageSkipHelper.SkippedPhasesCount.Remove(character.ID);
+        if (!Plugin.DropLootRelativeAmount.Value
+            || !MageSkipHelper.SkippedPhasesCount.TryGetValue(character.ID, out var skippedPhases))
+            return true;
 
-        if (extraPhases <= 0) return true; // Let original DropLoot run once for Artifacts/Quest items
+        MageSkipHelper.SkippedPhasesCount.Remove(character.ID);
+        MageSkipHelper.TotalCyclesCount.TryGetValue(character.ID, out var totalCycles);
+        MageSkipHelper.TotalCyclesCount.Remove(character.ID);
+
+        if (skippedPhases <= 0) return true;
+
+        // totalCycles is used as a divisor so that the *total* bonus across all extra drops equals roughly one normal phase-drop worth of loot, multiplied by the user's configured multiplier.
+        // Without this, a mage with 4 cycles would yield 4x full boss-drop amounts as bonus, far too much.
+        var effectiveTotalCycles = totalCycles > 0 ? totalCycles : 1;
 
         var randObj = RandField.GetValue(null);
-        for (var i = 0; i < extraPhases; i++)
-        {
-            DropStandardPhaseLoot(character, mDef, randObj);
-        }
+        for (var i = 0; i < skippedPhases; i++)
+            DropStandardPhaseLoot(character, mDef, randObj, effectiveTotalCycles);
 
-        return true; // Let original DropLoot run once for Artifacts/Quest items
+        return true; // always let the original DropLoot run for artifacts/quest items
     }
 
-    private static void DropStandardPhaseLoot(Character character, MonsterDef mDef, object rand)
+    private static void DropStandardPhaseLoot(Character character, MonsterDef mDef, object rand, int totalCycles)
     {
         if (mDef.type != 1) return;
 
         var multiplier = Plugin.DropLootMultiplier.Value;
 
-        // Calculate Item Find
+        // Item Find from the killing player.
         var itemFind = 1f;
         if (character.lastHitBy > -1)
         {
@@ -55,9 +62,7 @@ public static class CharDeathPatch
                 var player = killer.GetPlayer();
                 itemFind += player.equipment.GetItemFind(true) * 0.01f;
 
-                if (_getCharmValMethod == null) 
-                    _getCharmValMethod = AccessTools.Method(player.equipment.GetType(), "GetCharmVal");
-                
+                _getCharmValMethod ??= AccessTools.Method(player.equipment.GetType(), "GetCharmVal");
                 var charmVal = (float)_getCharmValMethod.Invoke(player.equipment, [6]);
                 itemFind += charmVal * 0.2f;
             }
@@ -65,7 +70,7 @@ public static class CharDeathPatch
 
         var spawnLoc = character.loc + new Vector2(0f, Math.Min(400, mDef.boxHeight) * -0.5f);
 
-        // 2. Drop Silver/XP Particles
+        // Silver, divided by totalCycles so the cumulative bonus across all extra drops stays proportional to a single hunt phase, not a full kill.
         var silverCount = (int)AccessTools.Method(rand.GetType(), "GetRandomInt", [typeof(int), typeof(int)])
             .Invoke(rand, [0, 3]);
         
@@ -74,28 +79,24 @@ public static class CharDeathPatch
             var silverBaseVal = (float)mDef.monsterField[62].iData;
             for (var i = 0; i < silverCount; i++)
             {
-                // Multiplied the silver amount by our config value
-                var amount = silverBaseVal / silverCount * 0.75f * multiplier;
-                ParticleManager.AddBackAdditiveParticle(42, spawnLoc, new Vector2(0, -200f), amount, 0f, 0, 0, character.ID);
+                var amount = silverBaseVal / silverCount * 0.75f * multiplier / totalCycles;
+                ParticleManager.AddBackAdditiveParticle(42, spawnLoc, new Vector2(0f, -200f), amount, 0f, 0, 0, character.ID);
             }
         }
 
-        // 3. Drop Materials (Indices 45-59)
+        // Materials (monsterField indices 45–59, 5 slots × 3 fields each).
         for (var j = 0; j < 5; j++)
         {
-            var strIdx = 45 + j * 3;
-            var probIdx = 46 + j * 3;
-            var countIdx = 47 + j * 3;
-
-            var itemKey = mDef.monsterField[strIdx].strData;
+            var itemKey = mDef.monsterField[45 + j * 3].strData;
             if (string.IsNullOrEmpty(itemKey)) continue;
 
-            // Keep standard probability (affected by Item Find)
-            var prob = mDef.monsterField[probIdx].fData * itemFind;
-            var maxDrop = mDef.monsterField[countIdx].iData;
+            // Scale probability down by totalCycles for the same reason as silver.
+            var prob    = mDef.monsterField[46 + j * 3].fData * itemFind / totalCycles;
+            var maxDrop = mDef.monsterField[47 + j * 3].iData;
             var lootIdx = LootCatalog.GetLootIdxOrNegative(itemKey);
 
             if (lootIdx <= -1) continue;
+
             var baseCount = 0;
             for (var l = 0; l < maxDrop; l++)
             {
@@ -105,10 +106,10 @@ public static class CharDeathPatch
             }
 
             if (baseCount <= 0) continue;
-            // Multiply the resulting quantity by the multiplier instead of adjusting probability
-            var finalCount = (int)Math.Max(1, Math.Round(baseCount * multiplier));
 
-            var adjustedIdx = GameSessionMgr.gameSession.missionTierAdjustor.AdjustUpgradeItem(lootIdx, character, false, false, true);
+            var finalCount  = (int)Math.Max(1, Math.Round(baseCount * multiplier));
+            var adjustedIdx = GameSessionMgr.gameSession.missionTierAdjustor
+                .AdjustUpgradeItem(lootIdx, character, false, false, true);
             GameSessionMgr.gameSession.mapMgr.pickups.AddPickup(spawnLoc, adjustedIdx, finalCount);
         }
     }
