@@ -44,16 +44,16 @@ public class Plugin : BasePlugin
     {
         Instance = this;
 
-        SkipNamedMages    = Config.Bind("General", "SkipNamedMages",    true,  "Skip hunt phases for named mission mages (e.g. Arzhan-Tin, Celus Zend).");
-        SkipFatedMages    = Config.Bind("General", "SkipFatedMages",    true,  "Skip hunt phases for fated mages (tiered mages shown with a tier number in mission select).");
-        SkipNamelessMages = Config.Bind("General", "SkipNamelessMages", true,  "Skip hunt phases for nameless mission mages (repeatable hunts, reward token_nameless).");
-        SkipGauntletMages = Config.Bind("General", "SkipGauntletMages", true,  "Skip hunt phases for gauntlet mages (each one immediately starts a boss fight).");
-        SkipWanderingMages  = Config.Bind("General", "SkipWanderingMages",  false, "Skip hunt phases for wandering/roaming mages.");
-        SpawnAtFinalLocation   = Config.Bind("General", "SpawnAtFinalLocation",   true,  "When skipping, teleport mission mages to their arena entrance. If false, they spawn at zone 0 and walk there.");
-        DropLootRelativeAmount = Config.Bind("Loot",    "DropLootRelativeAmount", true,  "Drop bonus loot on death to compensate for skipped hunt phases.");
-        DropLootMultiplier     = Config.Bind("Loot",    "DropLootMultiplier",     1.0f,  new ConfigDescription("Scales the bonus loot dropped per skipped phase. 1.0 = one extra phase-equivalent drop total.", new AcceptableValueRange<float>(0.1f, 10.0f)));
-        ReduceBossHp    = Config.Bind("General", "ReduceBossHP",       true,  "Start boss fight with reduced HP (simulates hunt damage).");
-        BossHpMultiplier = Config.Bind("General", "BossHpMultiplier",  1.0f,  "Multiply mage starting HP by this value after the hunt-damage reduction.");
+        SkipNamedMages          = Config.Bind("General", "SkipNamedMages",          true,   "Skip hunt phases for named mission mages (e.g. Arzhan-Tin, Celus Zend).");
+        SkipFatedMages          = Config.Bind("General", "SkipFatedMages",          true,   "Skip hunt phases for fated mages (tiered mages shown with a tier number in mission select).");
+        SkipNamelessMages       = Config.Bind("General", "SkipNamelessMages",       true,   "Skip hunt phases for nameless mission mages (repeatable hunts, reward token_nameless).");
+        SkipGauntletMages       = Config.Bind("General", "SkipGauntletMages",       true,   "Skip hunt phases for gauntlet mages (each one immediately starts a boss fight).");
+        SkipWanderingMages      = Config.Bind("General", "SkipWanderingMages",      false,  "Skip hunt phases for wandering/roaming mages.");
+        SpawnAtFinalLocation    = Config.Bind("General", "SpawnAtFinalLocation",    false,  "Teleport the primary mission mage directly to its arena entrance when skipping. Off by default, mages spawn at zone 0 and walk to the arena naturally. Only affects the non-invisible target mage; companion mages in the same hunt should be unaffected.");
+        DropLootRelativeAmount  = Config.Bind("Loot",    "DropLootRelativeAmount",  true,   "Drop bonus loot on death to compensate for skipped hunt phases.");
+        DropLootMultiplier      = Config.Bind("Loot",    "DropLootMultiplier",      1.0f,   new ConfigDescription("Scales the bonus loot dropped per skipped phase. 1.0 = one extra phase-equivalent drop total.", new AcceptableValueRange<float>(0.1f, 10.0f)));
+        ReduceBossHp            = Config.Bind("General", "ReduceBossHP",            true,   "Start boss fight with reduced HP (simulates hunt damage).");
+        BossHpMultiplier        = Config.Bind("General", "BossHpMultiplier",        1.0f,   "Multiply mage starting HP by this value after the hunt-damage reduction.");
 
         var modOptionsType = Type.GetType("SaS2ModOptions.SaS2ModOptions, amione.SaS2ModOptions");
         if (modOptionsType != null)
