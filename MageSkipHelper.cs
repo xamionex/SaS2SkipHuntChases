@@ -39,7 +39,7 @@ internal static class MageSkipHelper
 
         if (!LoggedMages.Contains(mage.charIdx))
         {
-            Plugin.Instance.Log.LogInfo($"mage detected: ID {mage.charIdx} ({GetMageName(mage)}), Invisible: {mage.missionInvisible}, Optional: {mage.optional}, Mission: {activeMission}, Type: {missionType}");
+            Plugin.Instance.Log.LogInfo($"mage detected: ID {mage.charIdx} ({GetMageName(mage)}), Invisible: {mage.missionInvisible}, Optional: {mage.optional}, HasCustomPath: {mage.hasCustomPath}, Mission: {activeMission}, Type: {missionType}");
             LoggedMages.Add(mage.charIdx);
         }
 
@@ -47,14 +47,13 @@ internal static class MageSkipHelper
         if (GauntletMgr.IsActive) return Plugin.SkipGauntletMages.Value;
         
         if (activeMission < 0) return false;
-        if (!mage.hasCustomPath) return false;
 
         return missionType switch
         {
-            1 => Plugin.SkipNamedMages.Value,     // Named
-            2 => Plugin.SkipNamelessMages.Value,  // Nameless, token_nameless reward
-            3 => Plugin.SkipFatedMages.Value,     // Fated, token_arena reward, tiered
-            _ => Plugin.SkipNamedMages.Value      // Fallback
+            1 => Plugin.SkipNamedMages.Value,                                     // Named
+            2 => mage.hasCustomPath && Plugin.SkipNamelessMages.Value,            // Nameless, requires custom path, token_nameless reward
+            3 => Plugin.SkipFatedMages.Value,                                     // Fated, token_arena reward, tiered
+            _ => mage.hasCustomPath && Plugin.SkipNamedMages.Value                // Fallback
         };
     }
 
@@ -114,12 +113,9 @@ internal static class MageSkipHelper
         var targetHp   = GauntletMgr.IsActive ? maxHp / 2f : maxHp / 4f;
         var newHp      = targetHp * Plugin.BossHpMultiplier.Value;
 
-        if (Math.Abs(character.hp - newHp) > 0.1f)
-        {
-            Plugin.Instance.Log.LogInfo($"Mage {mage.charIdx} HP: {character.hp} → {newHp}");
-            character.hp   = newHp;
-            mage.monsterHP = newHp;
-        }
+        if (!(Math.Abs(character.hp - newHp) > 0.1f)) return;
+        Plugin.Instance.Log.LogInfo($"Mage {mage.charIdx} HP: {character.hp} -> {newHp} (max: {maxHp})");
+        character.hp = newHp;
     }
 
     /// Marks all hunt cycles complete and records skipped count + total cycles so CharDeathPatch can scale bonus loot correctly.
