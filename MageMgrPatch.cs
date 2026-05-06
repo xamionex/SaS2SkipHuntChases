@@ -51,7 +51,7 @@ public static class MageMgrPatch
         if (!character.exists || character.mageIdx < 0) return;
 
         var mage = GameSessionMgr.gameSession.mageMgr.mage[character.mageIdx];
-        if (mage == null || !mage.exists) return;
+        if (mage is not { exists: true }) return;
 
         if (mage.totalCycles == 0 || mage.cycle >= mage.totalCycles) return;
 
@@ -78,7 +78,7 @@ public static class MageMgrPatch
         var character = CharMgr.character[mage.charIdx];
 
         // Teleport to final path node before the arena lookup so GetAddCharToArenaIdx can match the right arena by position.
-        if (Plugin.SpawnAtFinalLocation.Value && Plugin.GetPathNodeMethod != null && mage.hasCustomPath)
+        if (Plugin.SpawnAtFinalLocation.Value && !mage.missionInvisible && Plugin.GetPathNodeMethod != null && mage.hasCustomPath)
         {
             try
             {
@@ -122,7 +122,7 @@ public static class MageMgrPatch
             if (!character.exists || character.mageIdx < 0) continue;
 
             var mage = GameSessionMgr.gameSession.mageMgr.mage[character.mageIdx];
-            if (mage == null || !mage.exists) continue;
+            if (mage is not { exists: true }) continue;
 
             MageSkipHelper.ReduceBossHp(character, mage);
         }
