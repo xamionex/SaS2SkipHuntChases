@@ -84,7 +84,7 @@ public static class CharDeathPatch
             }
         }
 
-        // Materials (monsterField indices 45–59, 5 slots × 3 fields each).
+        // Materials (monsterField indices 45-59, 5 slots * 3 fields each).
         for (var j = 0; j < 5; j++)
         {
             var itemKey = mDef.monsterField[45 + j * 3].strData;

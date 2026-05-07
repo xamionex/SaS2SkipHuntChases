@@ -4,8 +4,8 @@
         <TargetFramework>net452</TargetFramework>
         <AssemblyName>amione.SaS2SkipHuntChases</AssemblyName>
         <Product>SaS2SkipHuntChases</Product>
-        <ProductDescription>pt.rs BepInEx Plugin Template!</ProductDescription>
-        <Version>1.0.8</Version>
+        <ProductDescription>Adds configurable options to skip mage hunt phases, along with modifying their loot drops and health</ProductDescription>
+        <Version>1.0.9</Version>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>latest</LangVersion>
         <RestoreAdditionalProjectSources>
