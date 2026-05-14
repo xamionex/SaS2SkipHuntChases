@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Timers;
 using BepInEx;
 using BepInEx.Configuration;
-using BepInEx.NetLauncher.Common;
+using BepInEx.NET.Common;
 using HarmonyLib;
 using ProjectMage;
 using ProjectMage.gamestate.mage;
