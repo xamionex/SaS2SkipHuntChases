@@ -30,7 +30,7 @@ internal static class MagePatch
         if (!shouldSkip && GameSessionMgr.gameSession.activeMission > 0)
             shouldSkip = MageSkipHelper.ShouldSkipMissionMage(__instance);
 
-        if (!shouldSkip) return true;          // No skipping → run original NextCycle
+        if (!shouldSkip) return true;          // No skipping, run original NextCycle
         if (!NetworkMgr.Instance.IsHost()) return true;
 
         if (__instance.charIdx < 0 || __instance.charIdx >= CharMgr.character.Length)
@@ -38,7 +38,7 @@ internal static class MagePatch
         var character = CharMgr.character[__instance.charIdx];
         if (character is not { exists: true }) return true;
 
-        // Already a boss → nothing more to do, skip original
+        // Already a boss, nothing more to do, skip original
         if (character.boss) return false;
 
         // If we already skipped this mage before, don't do it again
